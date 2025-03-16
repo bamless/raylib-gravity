@@ -31,6 +31,7 @@ static CelestialBody create_body(Vector2 position, Vector2 velocity, float densi
                                  Color color) {
     return (CelestialBody){
         .position = position,
+        .prev_position = position,
         .velocity = velocity,
         .radius = radius,
         .color = color,
