@@ -59,7 +59,7 @@ static Vector2 compute_gravitational_force(const CelestialBody* b1, const Celest
 
 static void update(float dt) {
     // Integrate positions using velocity Verlet
-    vec_foreach(CelestialBody* b, bodies) {
+    vec_foreach(CelestialBody * b, bodies) {
         integrate_pos(b, dt);
     }
 
@@ -75,12 +75,12 @@ static void update(float dt) {
     }
 
     // Integrate velocities using velocity Verlet
-    vec_foreach(CelestialBody* b, bodies) {
+    vec_foreach(CelestialBody * b, bodies) {
         integrate_vel(b, dt);
     }
 
     // Reset forces
-    vec_foreach(CelestialBody* b, bodies) {
+    vec_foreach(CelestialBody * b, bodies) {
         b->force = (Vector2){0};
     }
 }
@@ -116,8 +116,8 @@ static void spawn_body() {
         CelestialBody b = spawned_body;
         b.velocity = Vector2Subtract(GetMousePosition(), mouse_pressed_pos);
 
+        const float dt = 1.0 / SIMULATION_STEPS;
         for(size_t step = 0; step < PATH_POINTS; step++) {
-            const float dt = 1.0 / SIMULATION_STEPS;
             integrate_pos(&b, dt);
             for(size_t i = 0; i < vec_size(bodies); i++) {
                 CelestialBody* o = &bodies[i];
