@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 
 project(raylib-gravity)
 
-set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD 11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set default build type if not specified
@@ -17,18 +17,18 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT CMAKE_BUILD_TYPE STREQUAL "RelW
     include(CheckIPOSupported)
     check_ipo_supported(RESULT LTO)
     if(LTO)
-        message(STATUS "J* link-time optimization enabled")
+        message(STATUS "Link-time optimization enabled")
     endif()
 endif()
 
 # Set compiler flags
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wno-unused-parameter")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -fomit-frame-pointer -fno-plt -s")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wvla -Wno-unused-parameter")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native -fomit-frame-pointer -fno-plt -s")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -s")
 elseif(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT MSVC)
-    set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-unused-parameter")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Qunused-arguments -O3 -fomit-frame-pointer -fno-plt -s")
+    set(CMAKE_C_FLAGS "-Wall -Wextra -Wvla -Wno-unused-parameter")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Qunused-arguments -O3 -march=native -fomit-frame-pointer -fno-plt -s")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -s")
 elseif(MSVC)
     # Disable secure warnings for the useless _s variants of standard functions.

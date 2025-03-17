@@ -8,16 +8,18 @@
 #include "raylib.h"
 #include "raymath.h"
 
-#define G                30
-#define TARGET_FPS       60
-#define SIMULATION_STEPS 120
-#define PATH_POINTS      10000
+#define G                (30)
+#define SIMULATION_STEPS (120)
+#define PATH_POINTS      (10000)
+
+static const float sub_dt = 1. / SIMULATION_STEPS;
 
 typedef struct CelestialBody {
     Vector2 position, prev_position;
+    Vector2 force, prev_force;
     Vector2 velocity;
-    Vector2 force;
-    float radius, inv_mass;
+    float radius;
+    float inv_mass;
     Color color;
 } CelestialBody;
 
@@ -40,49 +42,58 @@ static CelestialBody create_body(Vector2 position, Vector2 velocity, float densi
 }
 
 static void integrate_pos(CelestialBody* b, float dt) {
-    b->prev_position = b->position;
+    // Position Verlet
+    //   a = F / m
+    //   x(t + dt) = x(t) + v(t) * dt + 0.5 * a(t) * dt^2
     b->position = Vector2Add(Vector2Add(b->position, Vector2Scale(b->velocity, dt)),
-                             Vector2Scale(b->force, dt * dt * b->inv_mass * 0.5));
+                             Vector2Scale(b->prev_force, dt * dt * b->inv_mass * 0.5));
 }
 
 static void integrate_vel(CelestialBody* b, float dt) {
-    // a = F / m
-    b->velocity = Vector2Add(b->velocity, Vector2Scale(b->force, dt * 0.5 * b->inv_mass));
+    // Velocity Verlet
+    //   a = F / m
+    //   v(t + dt) = v(t) + 0.5 * (a(t) + a(t + dt)) * dt
+    b->velocity = Vector2Add(b->velocity, Vector2Scale(Vector2Add(b->prev_force, b->force),
+                                                       dt * 0.5 * b->inv_mass));
 }
 
 static Vector2 compute_gravitational_force(const CelestialBody* b1, const CelestialBody* b2) {
     // F = G * (m1 * m2 / r^2)
     Vector2 r = Vector2Subtract(b2->position, b1->position);
-    float r2 = fmax(Vector2LengthSqr(r), 1e-2);
+    float r2 = fmaxf(Vector2LengthSqr(r), 1e-6f);
     r = Vector2Scale(r, 1 / sqrt(r2));
-    return Vector2Scale(r, G / (b1->inv_mass * b2->inv_mass) / r2);
+    float m1 = 1.0f / b1->inv_mass;
+    float m2 = 1.0f / b2->inv_mass;
+    return Vector2Scale(r, G * (m1 * m2) / r2);
+}
+
+static void apply_forces(CelestialBody* b, float dt) {
+    vec_foreach(CelestialBody* o, bodies) {
+        if(b != o) {
+            Vector2 f = compute_gravitational_force(b, o);
+            b->force = Vector2Add(b->force, f);
+        }
+    }
 }
 
 static void update(float dt) {
-    // Integrate positions using velocity Verlet
+    // Reset forces
+    vec_foreach(CelestialBody* b, bodies) {
+        b->prev_position = b->position;
+        b->prev_force = b->force;
+        b->force = (Vector2){0};
+    }
+
     vec_foreach(CelestialBody* b, bodies) {
         integrate_pos(b, dt);
     }
 
-    // Compute gravitational forces
-    for(size_t i = 0; i < vec_size(bodies); i++) {
-        CelestialBody* b1 = &bodies[i];
-        for(size_t j = i + 1; j < vec_size(bodies); j++) {
-            CelestialBody* b2 = &bodies[j];
-            Vector2 f = compute_gravitational_force(b1, b2);
-            b1->force = Vector2Add(b1->force, f);
-            b2->force = Vector2Subtract(b2->force, f);
-        }
+    vec_foreach(CelestialBody* b, bodies) {
+        apply_forces(b, dt);
     }
 
-    // Integrate velocities using velocity Verlet
     vec_foreach(CelestialBody* b, bodies) {
         integrate_vel(b, dt);
-    }
-
-    // Reset forces
-    vec_foreach(CelestialBody* b, bodies) {
-        b->force = (Vector2){0};
     }
 }
 
@@ -117,15 +128,12 @@ static void spawn_body() {
         CelestialBody b = spawned_body;
         b.velocity = Vector2Subtract(GetMousePosition(), mouse_pressed_pos);
 
-        const float dt = 1.0 / SIMULATION_STEPS;
         for(size_t step = 0; step < PATH_POINTS; step++) {
-            integrate_pos(&b, dt);
-            vec_foreach(const CelestialBody* o, bodies) {
-                Vector2 f = compute_gravitational_force(&b, o);
-                b.force = Vector2Add(b.force, f);
-            }
-            integrate_vel(&b, dt);
+            b.prev_force = b.force;
             b.force = (Vector2){0};
+            integrate_pos(&b, sub_dt);
+            apply_forces(&b, sub_dt);
+            integrate_vel(&b, sub_dt);
             spawn_path[step] = b.position;
         }
     }
@@ -153,21 +161,19 @@ static void draw(float alpha) {
 int main(void) {
     InitWindow(0, 0, "raylib [core] example - basic window");
     ToggleFullscreen();
-    SetTargetFPS(TARGET_FPS);
 
     const int width = GetScreenWidth(), height = GetScreenHeight();
 
-    vec_push_back(bodies, create_body((Vector2){width / 2., height / 2.}, (Vector2){0, 0}, 100, 100,
+    vec_push_back(bodies, create_body((Vector2){width / 2., height / 2.}, (Vector2){0}, 100, 100,
                                       ORANGE));
     vec_push_back(bodies, create_body((Vector2){width / 2. + 500, height / 2.},
-                                      (Vector2){0, 3 * TARGET_FPS}, 1, 30, BLUE));
+                                      (Vector2){0, 3 * 60}, 1, 30, BLUE));
     vec_push_back(bodies, create_body((Vector2){width / 2. - 500, height / 2.},
-                                      (Vector2){0, -3 * TARGET_FPS}, 2, 30, RED));
-    vec_push_back(bodies, create_body((Vector2){width / 2., height / 2. + 600},
-                                      (Vector2){3 * TARGET_FPS, 0}, 10, 50, GREEN));
+                                      (Vector2){0, -3 * 60}, 2, 30, RED));
+    vec_push_back(bodies, create_body((Vector2){width / 2., height / 2. + 900},
+                                      (Vector2){3 * 60, 0}, 10, 50, GREEN));
 
     float acc = 0;
-    const float sub_dt = 1. / SIMULATION_STEPS;
     while(!WindowShouldClose()) {
         float dt = GetFrameTime();
         acc += dt;
