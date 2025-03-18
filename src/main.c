@@ -60,7 +60,7 @@ static void integrate_vel(CelestialBody* b, float dt) {
 static Vector2 compute_gravitational_force(const CelestialBody* b1, const CelestialBody* b2) {
     // F = G * (m1 * m2 / r^2)
     Vector2 r = Vector2Subtract(b2->position, b1->position);
-    float r2 = fmaxf(Vector2LengthSqr(r), 1e-6f);
+    float r2 = fmaxf(Vector2LengthSqr(r), 1e-2f);
     r = Vector2Scale(r, 1 / sqrt(r2));
     float m1 = 1.0f / b1->inv_mass;
     float m2 = 1.0f / b2->inv_mass;
@@ -139,6 +139,34 @@ static void spawn_body() {
     }
 }
 
+static void print_energy() {
+    float ke = 0;
+    vec_foreach(const CelestialBody* b, bodies) {
+        ke += 0.5 * (1 / b->inv_mass) * Vector2LengthSqr(b->velocity);
+    }
+
+    float pe = 0;
+    for(size_t i = 0; i < vec_size(bodies); i++) {
+        for (size_t j =  i + 1; j < vec_size(bodies); j++) {
+            CelestialBody* b1 = &bodies[i];
+            CelestialBody* b2 = &bodies[j];
+
+            Vector2 r = Vector2Subtract(b2->position, b1->position);
+            float r_len = Vector2Length(r);
+
+            float m1 = 1 / b1->inv_mass;
+            float m2 = 1 / b2->inv_mass;
+
+            pe -= G * m1 * m2 / r_len;
+        }
+    }
+
+
+    float total_energy = ke + pe;
+    DrawText(TextFormat("KE: %f PE: %f", ke, pe), 0, 30, 30, BLACK);
+    DrawText(TextFormat("Total energy %f", total_energy), 0, 60, 30, BLACK);
+}
+
 static void draw(float alpha) {
     BeginDrawing();
 
@@ -154,6 +182,7 @@ static void draw(float alpha) {
             DrawLineEx(spawn_path[i], spawn_path[i + 1], 4, BLUE);
         }
     }
+    print_energy();
 
     EndDrawing();
 }
@@ -191,6 +220,6 @@ int main(void) {
         draw(alpha);
     }
 
-    CloseWindow();
     vec_free(bodies);
+    CloseWindow();
 }
