@@ -68,7 +68,7 @@ static Vector2 compute_gravitational_force(const CelestialBody* b1, const Celest
 }
 
 static void apply_forces(CelestialBody* b, float dt) {
-    vec_foreach(CelestialBody* o, bodies) {
+    vec_foreach(const CelestialBody* o, bodies) {
         if(b != o) {
             Vector2 f = compute_gravitational_force(b, o);
             b->force = Vector2Add(b->force, f);
