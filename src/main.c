@@ -184,8 +184,9 @@ static void draw(float alpha) {
 }
 
 int main(void) {
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_FULLSCREEN_MODE);
     InitWindow(0, 0, "raylib [core] example - basic window");
-    ToggleFullscreen();
+    SetTargetFPS(GetMonitorRefreshRate(GetCurrentMonitor()));
 
     const int width = GetScreenWidth(), height = GetScreenHeight();
 
