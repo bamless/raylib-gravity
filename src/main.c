@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ext_vector.h"
+#define EXTLIB_IMPLEMENTATION
+#include "extlib.h"
 #include "raylib.h"
 #include "raymath.h"
 
