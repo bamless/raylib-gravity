@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define EXTLIB_IMPLEMENTATION
+#define EXTLIB_IMPL
 #include "extlib.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -24,7 +24,13 @@ typedef struct CelestialBody {
     Color color;
 } CelestialBody;
 
-static CelestialBody* bodies;
+typedef struct {
+    CelestialBody* items;
+    size_t size, capacity;
+    Allocator* allocator;
+} CelestialBodies;
+
+static CelestialBodies bodies;
 static Vector2 mouse_pressed_pos;
 static CelestialBody spawned_body;
 static Vector2 spawn_path[PATH_POINTS];
@@ -69,7 +75,7 @@ static Vector2 compute_gravitational_force(const CelestialBody* b1, const Celest
 }
 
 static void apply_forces(CelestialBody* b, float dt) {
-    vec_foreach(const CelestialBody* o, bodies) {
+    array_foreach(CelestialBody, o, &bodies) {
         if(b != o) {
             Vector2 f = compute_gravitational_force(b, o);
             b->force = Vector2Add(b->force, f);
@@ -79,21 +85,21 @@ static void apply_forces(CelestialBody* b, float dt) {
 
 static void update(float dt) {
     // Reset forces
-    vec_foreach(CelestialBody* b, bodies) {
+    array_foreach(CelestialBody, b, &bodies) {
         b->prev_position = b->position;
         b->prev_force = b->force;
         b->force = (Vector2){0};
     }
 
-    vec_foreach(CelestialBody* b, bodies) {
+    array_foreach(CelestialBody, b, &bodies) {
         integrate_pos(b, dt);
     }
 
-    vec_foreach(CelestialBody* b, bodies) {
+    array_foreach(CelestialBody, b, &bodies) {
         apply_forces(b, dt);
     }
 
-    vec_foreach(CelestialBody* b, bodies) {
+    array_foreach(CelestialBody, b, &bodies) {
         integrate_vel(b, dt);
     }
 }
@@ -121,7 +127,7 @@ static void spawn_body() {
     if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
         show_spawn_path = false;
         spawned_body.velocity = Vector2Subtract(GetMousePosition(), mouse_pressed_pos);
-        vec_push_back(bodies, spawned_body);
+        array_push(&bodies, spawned_body);
     }
 
     // Compute the path of the spawned body
@@ -142,18 +148,18 @@ static void spawn_body() {
 
 static void print_energy() {
     float ke = 0.0f;
-    vec_foreach(CelestialBody* b, bodies) {
+    array_foreach(CelestialBody, b, &bodies) {
         float v2 = Vector2LengthSqr(b->velocity);
         ke += (0.5f / b->inv_mass) * v2;
     }
 
     float pe = 0.0f;
-    for (size_t i = 0; i < vec_size(bodies); i++) {
-        for (size_t j = i + 1; j < vec_size(bodies); j++) {
-            Vector2 r = Vector2Subtract(bodies[j].position, bodies[i].position);
+    for (size_t i = 0; i < bodies.size; i++) {
+        for (size_t j = i + 1; j < bodies.size; j++) {
+            Vector2 r = Vector2Subtract(bodies.items[j].position, bodies.items[i].position);
             float r_len = Vector2Length(r);
-            float m1 = 1.0f / bodies[i].inv_mass;
-            float m2 = 1.0f / bodies[j].inv_mass;
+            float m1 = 1.0f / bodies.items[i].inv_mass;
+            float m2 = 1.0f / bodies.items[j].inv_mass;
             pe -= G * (m1 * m2) / r_len;
         }
     }
@@ -169,7 +175,7 @@ static void draw(float alpha) {
     ClearBackground(RAYWHITE);
     DrawText(TextFormat("FPS: %d\n", GetFPS()), 0, 0, 30, BLACK);
 
-    vec_foreach(const CelestialBody* b, bodies) {
+    array_foreach(CelestialBody, b, &bodies) {
         DrawCircleV(Vector2Lerp(b->prev_position, b->position, alpha), b->radius, b->color);
     }
 
@@ -191,14 +197,11 @@ int main(void) {
 
     const int width = GetScreenWidth(), height = GetScreenHeight();
 
-    vec_push_back(bodies, create_body((Vector2){width / 2., height / 2.}, (Vector2){0}, 100, 100,
-                                      ORANGE));
-    vec_push_back(bodies, create_body((Vector2){width / 2. + 500, height / 2.},
-                                      (Vector2){0, 3 * 60}, 1, 30, BLUE));
-    vec_push_back(bodies, create_body((Vector2){width / 2. - 500, height / 2.},
-                                      (Vector2){0, -3 * 60}, 2, 30, RED));
-    vec_push_back(bodies, create_body((Vector2){width / 2., height / 2. + 900},
-                                      (Vector2){3 * 60, 0}, 10, 50, GREEN));
+    bodies.allocator = &temp_allocator.base;
+    array_push(&bodies, create_body((Vector2){width / 2., height / 2.}, (Vector2){0}, 100, 100, ORANGE));
+    array_push(&bodies, create_body((Vector2){width / 2. + 500, height / 2.}, (Vector2){0, 3 * 60}, 1, 30, BLUE));
+    array_push(&bodies, create_body((Vector2){width / 2. - 500, height / 2.}, (Vector2){0, -3 * 60}, 2, 30, RED));
+    array_push(&bodies, create_body((Vector2){width / 2., height / 2. + 900}, (Vector2){3 * 60, 0}, 10, 50, GREEN));
 
     float acc = 0;
     while(!WindowShouldClose()) {
@@ -219,5 +222,4 @@ int main(void) {
     }
 
     CloseWindow();
-    vec_free(bodies);
 }
